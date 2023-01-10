@@ -1,0 +1,7 @@
+valgrind --tool=memcheck --leak-check=full --suppressions=valgrind-python.supp --log-file=minimal.valgrind.log python minimal.py
+
+valgrind --tool=memcheck --leak-check=full --suppressions=valgrind-python.supp --log-file=minimal_iter.valgrind.log python minimal_iter.py
+
+tail -n 12 minimal.valgrind.log
+echo
+tail -n 12 minimal_iter.valgrind.log
