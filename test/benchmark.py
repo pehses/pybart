@@ -7,7 +7,7 @@ import bart
 
 testcode="""
 def bench(pkg):
-    sig = pkg.bart(1, 'phantom -x 1024')
+    sig = pkg.bart(1, 'phantom -x1024 -s4')
     sig = pkg.bart(1, 'fft 7', sig)
     sig = pkg.bart(1, 'fft -i 7', sig)
     return sig

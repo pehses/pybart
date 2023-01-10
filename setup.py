@@ -18,5 +18,6 @@ setup(
                  include_dirs=[numpy.get_include(), '/opt/src/bart/src/'],
                  library_dirs=['/usr/lib'],
                  libraries=['bart'],
+                 compile_args=['-fopenmp', '-DUSE_OPEN_MP=1'],
                  dependencies=['cython', 'numpy'])],
 )

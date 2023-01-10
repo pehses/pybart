@@ -30,12 +30,11 @@ cdef extern from "bart_embed_api.h":
     int bart_command(int len_, char* out, int argc, char* argv[])
 
 
-def call_bart(bart_cmd, input_data, outfiles):
+def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
 
-    # define how memory output arrays should be managed
+    # let_numpy_manage_arrays: define how memory output arrays should be managed
     # True: numpy manages data; False: bart deletes data after copy to numpy object
     # False will "indirectly" leak a very small amount of memory (memcfl_list properties like name&dims?)
-    let_numpy_manage_arrays = False
 
     nargs = len(bart_cmd)
     cdef unsigned int DIMS = 16
