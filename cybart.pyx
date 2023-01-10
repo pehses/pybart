@@ -9,12 +9,10 @@ Created on Mon Jan  9 18:10:39 2023
 
 # cimport the Cython declarations for numpy
 from libcpp cimport bool
-cimport numpy as c_np
 from libc.stdlib cimport malloc, free
-import sys
 import numpy as np
-
-c_np.import_array()
+cimport numpy as np
+np.import_array()
 
 cdef extern from "Python.h":
     const char* PyUnicode_AsUTF8(object unicode)
@@ -47,8 +45,9 @@ def call_bart(bart_cmd, input_data, outfiles):
     let_numpy_manage_arrays = False
 
     nargs = len(bart_cmd)
-    cdef c_np.npy_intp nd = 16
-    cdef c_np.npy_intp size
+    cdef unsigned int DIMS = 16
+    cdef np.npy_intp nd = DIMS
+    cdef np.npy_intp size
     cdef long c_dims[16]
     cdef float complex* c_array_in[8]
     cdef float complex* c_array_out
@@ -63,19 +62,16 @@ def call_bart(bart_cmd, input_data, outfiles):
 
     for k, (name, data) in enumerate(input_data.items()):
         # create memcfl for input
-        dims = np.ones((16), dtype=np.int64)
-        dims[:data.ndim] = data.shape
-        for key, item in enumerate(dims):
-            c_dims[key] = item
-        if data.dtype != np.complex64:
-            data = data.astype(np.complex64)
-        data = np.asfortranarray(data)
-        c_array_in[k] = <float complex*> c_np.PyArray_DATA(data)
-        memcfl_register(name, 16, c_dims, c_array_in[k], False)
+        # initialize c_dims
+        for d in range(DIMS):
+            if d < data.ndim:
+                c_dims[d] = data.shape[d]
+            else:
+                c_dims[d] = 1
+        c_array_in[k] = <float complex*> np.PyArray_DATA(data)
+        memcfl_register(name, DIMS, c_dims, c_array_in[k], False)
 
     errcode = bart_command(4096, stdout, nargs, string_buf)
-    # errcode = bart_command(0, NULL, nargs, string_buf)
-    print('errcode: ', errcode)
     free(string_buf)
 
     # clean up the input data
@@ -86,32 +82,38 @@ def call_bart(bart_cmd, input_data, outfiles):
     output = list()
     for name in outfiles:
         io_reserve_input(name)
-        c_array_out = memcfl_load(name, 16, c_dims)
+        c_array_out = memcfl_load(name, DIMS, c_dims)
 
-        dims = c_np.PyArray_SimpleNewFromData(1, &nd,
-                    c_np.NPY_LONG, <void *> c_dims)
-        c_np.PyArray_UpdateFlags(dims, dims.flags.num | c_np.NPY_OWNDATA)
-
-        # determine number of dimensions
-        for k in range(nd-1, -1, -1):
+        # determine number of elements and dimensions
+        size = DIMS
+        dims = np.PyArray_ZEROS(1, &size, np.NPY_LONG, 0)
+        size = 1
+        ndim = 1
+        for k in range(DIMS):
+            dims[k] = c_dims[k]
+            size *= dims[k]
             if dims[k] > 1:
-                break
+                ndim = k+1
 
-        # determine number of elements
-        size = dims.prod()
-
-        ndarray = c_np.PyArray_SimpleNewFromData(1, &size,
-                    c_np.NPY_COMPLEX64, <void *> c_array_out)
+        ndarray = np.PyArray_SimpleNewFromData(1, &size,
+                    np.NPY_COMPLEX64, <void *> c_array_out)
         
         if let_numpy_manage_arrays:
-            c_np.PyArray_UpdateFlags(ndarray, ndarray.flags.num | c_np.NPY_OWNDATA)
-            output.append(ndarray.reshape(dims[:k+1], order='F'))
+            np.PyArray_UpdateFlags(ndarray, ndarray.flags.num | np.NPY_OWNDATA)
+            output.append(ndarray.reshape(dims[:ndim], order='F'))
         else:
-            output.append(ndarray.reshape(dims[:k+1], order='F').copy())
+            output.append(ndarray.reshape(dims[:ndim], order='F').copy())
             memcfl_unmap(c_array_out)
             memcfl_unlink(name)  # this will destroy the output data
 
     io_memory_cleanup()
+
+    # print('infiles:')
+    # for name in input_data:
+    #     print(name.decode('utf-8'), memcfl_exists(name))
+    # print('outfiles:')
+    # for name in outfiles:
+    #     print(name.decode('utf-8'), memcfl_exists(name))
 
     return output, errcode, stdout.decode('utf-8')
 
@@ -123,19 +125,18 @@ def bart(nargout, cmd, *args, **kwargs):
 
     cmd = cmd.strip()
     if len(cmd)>0:
-        bart_cmd = cmd.split(' ')  # not really necessary, just for consistency
+        bart_cmd = cmd.split(' ')
 
-    for key, item in kwargs.items():
-        kw = ("--" if len(key)>1 else "-") + key
+    for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
+        if key is not None:
+            kw = ("--" if len(key)>1 else "-") + key
+            bart_cmd.append(kw)
         name = random_name() + '.mem'
-        input_data[name.encode('utf-8')] = item
-        bart_cmd.append(kw)
         bart_cmd.append(name)
-
-    for item in args:
-        name = random_name() + '.mem'
+        if item.dtype != np.complex64:
+            item = item.astype(np.complex64)
+        item = np.asfortranarray(item)
         input_data[name.encode('utf-8')] = item
-        bart_cmd.append(name)
     
     outfiles = []
     for _ in range(nargout):
@@ -153,13 +154,6 @@ def bart(nargout, cmd, *args, **kwargs):
         print(f"Command exited with error code {errcode}.")
         return
 
-    # print('infiles:')
-    # for name in input_data:
-    #     print(name.decode('utf-8'), memcfl_exists(name))
-    # print('outfiles:')
-    # for name in outfiles:
-    #     print(name.decode('utf-8'), memcfl_exists(name))
-    
     if nargout == 0:
         return
     elif nargout == 1:
