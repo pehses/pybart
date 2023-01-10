@@ -9,6 +9,7 @@ Created on Mon Jan  9 18:10:39 2023
 
 # cimport the Cython declarations for numpy
 from libcpp cimport bool
+import numpy as np
 cimport numpy as np
 np.import_array()
 
@@ -30,12 +31,11 @@ cdef extern from "bart_embed_api.h":
     int bart_command(int len_, char* out, int argc, char* argv[])
 
 
-def call_bart(bart_cmd, input_data, outfiles):
+def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
 
-    # define how memory output arrays should be managed
+    # let_numpy_manage_arrays: define how memory output arrays should be managed
     # True: numpy manages data; False: bart deletes data after copy to numpy object
     # False will "indirectly" leak a very small amount of memory (memcfl_list properties like name&dims?)
-    let_numpy_manage_arrays = False
 
     nargs = len(bart_cmd)
     cdef unsigned int DIMS = 16
@@ -104,3 +104,50 @@ def call_bart(bart_cmd, input_data, outfiles):
     #     print(name.decode('utf-8'), memcfl_exists(name))
 
     return output, errcode, stdout.decode('utf-8')
+
+
+def random_name(N=8):
+    import random
+    import string
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=N))
+
+
+def bart(nargout, cmd, *args, **kwargs):
+
+    input_data = {}
+    bart_cmd = ['bart']  # empty cmd string will list available commands
+
+    cmd = cmd.strip()
+    if len(cmd) > 0:
+        bart_cmd = cmd.split(' ')
+
+    for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
+        if key is not None:
+            kw = ("--" if len(key) > 1 else "-") + key
+            bart_cmd.append(kw)
+        name = random_name() + '.mem'
+        bart_cmd.append(name)
+        if item.dtype != np.complex64:
+            item = item.astype(np.complex64)
+        item = np.asfortranarray(item)
+        input_data[name.encode('utf-8')] = item
+
+    outfiles = []
+    for _ in xrange(nargout):
+        # create memcfl names for output
+        name = random_name() + '.mem'
+        outfiles.append(name.encode('utf-8'))
+        bart_cmd.append(name)
+
+    output, errcode, stdout = call_bart(bart_cmd, input_data, outfiles)
+
+    if errcode:
+        print(f"Command exited with error code {errcode}.")
+        return
+
+    if nargout == 0:
+        return
+    elif nargout == 1:
+        return output[0]
+    else:
+        return output
