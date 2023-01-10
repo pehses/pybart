@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import cybart
+import pybart
 import bart
 
 # d = np.arange(16)
-# cybart.bart(0, "show", d)
+# pybart.bart(0, "show", d)
 
-cy = cybart.bart(1, "phantom -x 32")
+cy = pybart.bart(1, "phantom -x 32")
 print(cy.shape)
 
 rev = bart.bart(1, "phantom -x 32")
@@ -23,6 +23,6 @@ plt.axis('off')
 
 plt.subplot(122)
 plt.imshow(abs(cy))
-plt.title('cybart')
+plt.title('pybart')
 plt.axis('off')
 plt.show()

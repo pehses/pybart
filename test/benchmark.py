@@ -1,7 +1,7 @@
 import timeit
 
 import_module="""
-import cybart
+import pybart
 import bart
 """
 
@@ -14,4 +14,4 @@ def bench(pkg):
 """
 
 print("bart: ", timeit.repeat(stmt=testcode + "bench(bart)",  setup=import_module, repeat=5, number=1))
-print("cybart: ", timeit.repeat(stmt=testcode + "bench(cybart)",  setup=import_module, repeat=5, number=1))
+print("pybart: ", timeit.repeat(stmt=testcode + "bench(pybart)",  setup=import_module, repeat=5, number=1))

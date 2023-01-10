@@ -1,5 +1,5 @@
 
-from _cybart import call_bart
+from _pybart import call_bart
 import numpy as np
 
 

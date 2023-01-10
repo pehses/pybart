@@ -1,5 +1,5 @@
 """
-cybart: Python bindings for BART (https://github.com/mrirecon/bart)
+pybart: Python bindings for BART (https://github.com/mrirecon/bart)
         written in Cython
 
 Created on Mon Jan  9 18:10:39 2023
