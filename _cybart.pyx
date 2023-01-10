@@ -9,8 +9,6 @@ Created on Mon Jan  9 18:10:39 2023
 
 # cimport the Cython declarations for numpy
 from libcpp cimport bool
-from libc.stdlib cimport malloc, free
-import numpy as np
 cimport numpy as np
 np.import_array()
 
@@ -31,11 +29,6 @@ cdef extern from "misc/memcfl.h":
 cdef extern from "bart_embed_api.h":
     int bart_command(int len_, char* out, int argc, char* argv[])
 
-def random_name(N=12):
-    import random
-    import string
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=N))
-
 
 def call_bart(bart_cmd, input_data, outfiles):
 
@@ -51,19 +44,15 @@ def call_bart(bart_cmd, input_data, outfiles):
     cdef long c_dims[16]
     cdef float complex* c_array_in[8]
     cdef float complex* c_array_out
-    cdef char *argv[256]
     cdef char stdout[4096]
-    cdef char **string_buf = <char **>malloc(nargs * sizeof(char*))
-    string_buf[0] = '\0'
-    stdout[0] = '\0'
-
-    for key, item in enumerate(bart_cmd):
-        string_buf[key] = PyUnicode_AsUTF8(item)
+    cdef char *argv[256]
+    for i in xrange(nargs):
+        argv[i] = PyUnicode_AsUTF8(bart_cmd[i])
 
     for k, (name, data) in enumerate(input_data.items()):
         # create memcfl for input
         # initialize c_dims
-        for d in range(DIMS):
+        for d in xrange(DIMS):
             if d < data.ndim:
                 c_dims[d] = data.shape[d]
             else:
@@ -71,8 +60,7 @@ def call_bart(bart_cmd, input_data, outfiles):
         c_array_in[k] = <float complex*> np.PyArray_DATA(data)
         memcfl_register(name, DIMS, c_dims, c_array_in[k], False)
 
-    errcode = bart_command(4096, stdout, nargs, string_buf)
-    free(string_buf)
+    errcode = bart_command(4096, stdout, nargs, argv)
 
     # clean up the input data
     for k, name in enumerate(input_data):
@@ -89,7 +77,7 @@ def call_bart(bart_cmd, input_data, outfiles):
         dims = np.PyArray_ZEROS(1, &size, np.NPY_LONG, 0)
         size = 1
         ndim = 1
-        for k in range(DIMS):
+        for k in xrange(DIMS):
             dims[k] = c_dims[k]
             size *= dims[k]
             if dims[k] > 1:
@@ -116,47 +104,3 @@ def call_bart(bart_cmd, input_data, outfiles):
     #     print(name.decode('utf-8'), memcfl_exists(name))
 
     return output, errcode, stdout.decode('utf-8')
-
-
-def bart(nargout, cmd, *args, **kwargs):
-
-    input_data = {}
-    bart_cmd = ['bart']  # empty cmd string will output list of available commands
-
-    cmd = cmd.strip()
-    if len(cmd)>0:
-        bart_cmd = cmd.split(' ')
-
-    for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
-        if key is not None:
-            kw = ("--" if len(key)>1 else "-") + key
-            bart_cmd.append(kw)
-        name = random_name() + '.mem'
-        bart_cmd.append(name)
-        if item.dtype != np.complex64:
-            item = item.astype(np.complex64)
-        item = np.asfortranarray(item)
-        input_data[name.encode('utf-8')] = item
-    
-    outfiles = []
-    for _ in range(nargout):
-        # create memcfl names for output
-        name = random_name() + '.mem'
-        outfiles.append(name.encode('utf-8'))
-        bart_cmd.append(name)
-
-    output, errcode, stdout = call_bart(bart_cmd, input_data, outfiles)
-
-    if len(stdout)>0:
-        print(stdout)
-
-    if errcode:
-        print(f"Command exited with error code {errcode}.")
-        return
-
-    if nargout == 0:
-        return
-    elif nargout == 1:
-        return output[0]
-    else:
-        return output
