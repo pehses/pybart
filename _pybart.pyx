@@ -9,6 +9,7 @@ Created on Mon Jan  9 18:10:39 2023
 
 # cimport the Cython declarations for numpy
 from libcpp cimport bool
+import numpy as np
 cimport numpy as np
 np.import_array()
 
@@ -43,7 +44,8 @@ def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
     cdef long c_dims[16]
     cdef float complex* c_array_in[8]
     cdef float complex* c_array_out
-    cdef char stdout[4096]
+    cdef char stdout[1024]
+    stdout[0] = '\0'
     cdef char *argv[256]
     for i in xrange(nargs):
         argv[i] = PyUnicode_AsUTF8(bart_cmd[i])
@@ -59,7 +61,7 @@ def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
         c_array_in[k] = <float complex*> np.PyArray_DATA(data)
         memcfl_register(name, DIMS, c_dims, c_array_in[k], False)
 
-    errcode = bart_command(4096, stdout, nargs, argv)
+    errcode = bart_command(1024, stdout, nargs, argv)
 
     # clean up the input data
     for k, name in enumerate(input_data):
@@ -103,3 +105,50 @@ def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
     #     print(name.decode('utf-8'), memcfl_exists(name))
 
     return output, errcode, stdout.decode('utf-8')
+
+
+def random_name(N=8):
+    import random
+    import string
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=N))
+
+
+def bart(nargout, cmd, *args, **kwargs):
+
+    input_data = {}
+    bart_cmd = ['bart']  # empty cmd string will list available commands
+
+    cmd = cmd.strip()
+    if len(cmd) > 0:
+        bart_cmd = cmd.split(' ')
+
+    for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
+        if key is not None:
+            kw = ("--" if len(key) > 1 else "-") + key
+            bart_cmd.append(kw)
+        name = random_name() + '.mem'
+        bart_cmd.append(name)
+        if item.dtype != np.complex64:
+            item = item.astype(np.complex64)
+        item = np.asfortranarray(item)
+        input_data[name.encode('utf-8')] = item
+
+    outfiles = []
+    for _ in xrange(nargout):
+        # create memcfl names for output
+        name = random_name() + '.mem'
+        outfiles.append(name.encode('utf-8'))
+        bart_cmd.append(name)
+
+    output, errcode, stdout = call_bart(bart_cmd, input_data, outfiles)
+
+    if errcode:
+        print(f"Command exited with error code {errcode}.")
+        return
+
+    if nargout == 0:
+        return
+    elif nargout == 1:
+        return output[0]
+    else:
+        return output
