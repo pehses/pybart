@@ -45,11 +45,10 @@ def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
     cdef float complex* c_array_in[8]
     cdef float complex* c_array_out
     cdef char stdout[1024]
-    stdout[0] = '\0'
     cdef char *argv[256]
     for i in xrange(nargs):
         argv[i] = PyUnicode_AsUTF8(bart_cmd[i])
-
+    
     for k, (name, data) in enumerate(input_data.items()):
         # create memcfl for input
         # initialize c_dims
@@ -120,8 +119,7 @@ def bart(nargout, cmd, *args, **kwargs):
 
     cmd = cmd.strip()
     if len(cmd) > 0:
-        bart_cmd = cmd.split(' ')
-
+        bart_cmd[1:] = cmd.split(' ')
     for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
         if key is not None:
             kw = ("--" if len(key) > 1 else "-") + key

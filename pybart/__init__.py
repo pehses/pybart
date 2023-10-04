@@ -12,12 +12,10 @@ def random_name(N=8):
 def bart(nargout, cmd, *args, **kwargs):
 
     input_data = {}
-    bart_cmd = ['bart']  # empty cmd string will list available commands
-
+    bart_cmd = ['bart']  # we need to add 'bart' for new versions of bart
     cmd = cmd.strip()
     if len(cmd) > 0:
-        bart_cmd = cmd.split(' ')
-
+        bart_cmd[1:] = cmd.split(' ')
     for key, item in (*kwargs.items(), *zip([None]*len(args), args)):
         if key is not None:
             kw = ("--" if len(key) > 1 else "-") + key
