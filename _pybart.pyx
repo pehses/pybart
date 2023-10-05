@@ -106,6 +106,9 @@ def call_bart(bart_cmd, input_data, outfiles, let_numpy_manage_arrays = False):
     return output, errcode, stdout.decode('utf-8')
 
 
+import sys
+
+
 def random_name(N=8):
     import random
     import string
@@ -143,6 +146,9 @@ def bart(nargout, cmd, *args, **kwargs):
     if errcode:
         print(f"Command exited with error code {errcode}.")
         return
+
+    print("Output from the external library")
+    sys.stdout.flush()
 
     if nargout == 0:
         return
