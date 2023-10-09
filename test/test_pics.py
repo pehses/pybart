@@ -9,6 +9,6 @@ print(sig.shape)
 sens = bart(1, 'ecalib', sig)  # -> "free(): invalid next size (fast)"
 print(sens.shape)
 
-reco = bart(1, 'pics', sig, sens)
+reco = bart(1, 'pics -d3', sig, sens)
 print(reco.shape)
 
